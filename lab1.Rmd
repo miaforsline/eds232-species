@@ -51,7 +51,12 @@ df <- res$gbif$data[[1]]
 df_clean <- df %>% 
   filter(name %in% c("Necturus maculosus (Rafinesque, 1818)", "Necturus maculosus maculosus")) %>% #remove weirdly named points
   filter(longitude < 0) #remove one observation in Europe 
-nrow(df_clean) # number of rows
+nrow(df_clean)# number of rows
+
+#remove duplicate observations with the same long/lat values 
+dups2 <- duplicated(df_clean[, c('longitude', 'latitude')])
+sum(dups2)
+df_clean <- df_clean[!dups2, ]
 ```
 
 ```{r}
@@ -66,8 +71,15 @@ readr::write_csv(df_clean, obs_csv)
 geojsonio::geojson_write(obs, obs_geo, file = "obs.geojson")
 
 # show points on map
-mapview::mapview(obs, map.types = "Stamen.Terrain")
+mapview::mapview(obs, map.types = "Stamen.Watercolor")
 ```
+
+Question 1. How many observations total are in GBIF for your species? 
+In total, GBIF contains 1,205 observations of Necturus maculosus. 
+
+Question 2. Do you see any odd observations, like marine species on land or vice versa? If so, please see the Data Cleaning and explain what you did to fix or remove these points.
+
+Yes, I removed observations with the incorrect species name as well as one outlier located in Europe. I also removed 421 duplicate observations. 
 
 ```{r}
 
