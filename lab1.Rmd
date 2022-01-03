@@ -1,0 +1,75 @@
+---
+title: "Lab 1: Species Distribution Models"
+author: "Mia Forsline"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Install Packages 
+
+```{r}
+# load packages, installing if missing
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  dismo, dplyr, DT, ggplot2, here, htmltools, leaflet, mapview, purrr, raster, readr, rgbif, rgdal, rJava, sdmpredictors, sf, spocc, tidyr)
+select <- dplyr::select # overwrite raster::select
+
+# set random seed for reproducibility
+set.seed(42)
+
+# directory to store data
+dir_data <- here("data")
+dir.create(dir_data, showWarnings = F)
+```
+
+# Get species observation data for *Necturus maculosus*, the common mudpuppy 
+
+insert image
+
+```{r}
+obs_csv <- file.path(dir_data, "obs.csv")
+obs_geo <- file.path(dir_data, "obs.geojson")
+
+# get species occurrence data from GBIF with coordinates
+(res <- spocc::occ(
+  query = 'Necturus maculosus', 
+  from = 'gbif',
+  limit = 10000,
+  has_coords = T))
+```
+
+```{r}
+# extract data frame from result
+df <- res$gbif$data[[1]]
+df_clean <- df %>% 
+  filter(name %in% c("Necturus maculosus (Rafinesque, 1818)", "Necturus maculosus maculosus")) %>% #remove weirdly named points
+  filter(longitude < 0) #remove one observation in Europe 
+nrow(df_clean) # number of rows
+```
+
+```{r}
+# convert to points of observation from lon/lat columns in data frame
+obs <- df_clean %>% 
+  sf::st_as_sf(
+    coords = c("longitude", "latitude"),
+    crs = st_crs(4326))
+
+readr::write_csv(df_clean, obs_csv)
+#sf::write_sf(obs, obs_geo)
+geojsonio::geojson_write(obs, obs_geo, file = "obs.geojson")
+
+# show points on map
+mapview::mapview(obs, map.types = "Stamen.Terrain")
+```
+
+```{r}
+
+```
+
