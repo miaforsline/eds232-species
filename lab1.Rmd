@@ -2,15 +2,29 @@
 title: "Lab 1: Species Distribution Models"
 author: "Mia Forsline"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: hide
+    
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, 
+                      message = FALSE,
+                      warning = FALSE)
 ```
 
-# Install Packages 
+# Learning Objectives: 
+- Fetch species observations from the Global Biodiversity Information Facility (GBIF.org) using an R package that wraps a function around their API.
+- Fetch environmental data for defining environmental relationship in the species distribution model (SDM).
+- Generate pseudo-absences, or background, points with which to differentiate from the species presence points in the SDM.
+- Extract underlying environmental data from points.
+- Plot term plots of each environmental predictor with the species response.
 
+# Install Packages
 ```{r}
 # load packages, installing if missing
 if (!require(librarian)){
@@ -29,15 +43,18 @@ dir_data <- here("data")
 dir.create(dir_data, showWarnings = F)
 ```
 
-# Get species observation data for *Necturus maculosus*, the common mudpuppy 
+# Get species observation data for *Necturus maculosus*, the common mudpuppy salamander 
 
-insert image
+![Source: http://www.biokids.umich.edu/critters/Necturus_maculosus/pictures/resources/contributors/Grzimek_herps/Proteidae/Necturus_maculosus/](mudpup.jpeg)
 
+![Source: https://www.brainerddispatch.com/sports/2795363-DNR-Report-all-endangered-mudpuppy-salamanders-die-offs](mudpup2.jpeg)
+## Retrieve species occurrence data from GBIF 
+- retrieve only observations with latitude and longitude coordinates
+- there are 1,205 *N. maculosus* observations 
 ```{r}
 obs_csv <- file.path(dir_data, "obs.csv")
 obs_geo <- file.path(dir_data, "obs.geojson")
 
-# get species occurrence data from GBIF with coordinates
 (res <- spocc::occ(
   query = 'Necturus maculosus', 
   from = 'gbif',
@@ -45,22 +62,27 @@ obs_geo <- file.path(dir_data, "obs.geojson")
   has_coords = T))
 ```
 
+## Extract and clean data from the GBIF retrieval results 
+- keep only *N. maculosus* observation  points 
+- remove duplicate observations 
+- after cleaning, there are 776 *N. maculosus* observation  points 
 ```{r}
-# extract data frame from result
 df <- res$gbif$data[[1]]
 df_clean <- df %>% 
   filter(name %in% c("Necturus maculosus (Rafinesque, 1818)", "Necturus maculosus maculosus")) %>% #remove weirdly named points
   filter(longitude < 0) #remove one observation in Europe 
 nrow(df_clean)# number of rows
 
-#remove duplicate observations with the same long/lat values 
 dups2 <- duplicated(df_clean[, c('longitude', 'latitude')])
 sum(dups2)
 df_clean <- df_clean[!dups2, ]
+nrow(df_clean)
 ```
 
+## Use longitude and latitude to create points of observation and put them in a data frame 
+- add CRS 4326 
+- map the points 
 ```{r}
-# convert to points of observation from lon/lat columns in data frame
 obs <- df_clean %>% 
   sf::st_as_sf(
     coords = c("longitude", "latitude"),
@@ -71,17 +93,21 @@ readr::write_csv(df_clean, obs_csv)
 geojsonio::geojson_write(obs, obs_geo, file = "obs.geojson")
 
 # show points on map
-mapview::mapview(obs, map.types = "Stamen.Watercolor")
+#mapview::mapview(obs, map.types = "Stamen.Watercolor")
 ```
 
-Question 1. How many observations total are in GBIF for your species? 
-In total, GBIF contains 1,205 observations of Necturus maculosus. 
+**Question 1.** How many observations total are in GBIF for your species? 
 
-Question 2. Do you see any odd observations, like marine species on land or vice versa? If so, please see the Data Cleaning and explain what you did to fix or remove these points.
+In total, GBIF contains 1,205 observations of *N. maculosus*.
 
-Yes, I removed observations with the incorrect species name as well as one outlier located in Europe. I also removed 421 duplicate observations. 
+**Question 2.** Do you see any odd observations, like marine species on land or vice versa? If so, please see the Data Cleaning and explain what you did to fix or remove these points.
 
-# Get Environment Data 
+Yes, I removed observations with the incorrect species name as well as one outlier observation point located in Europe. I also removed 421 duplicate observations.
+
+# Get Environment Data using `sdmpredictors` 
+
+## Presence 
+- retrieve terrestrial environmental data for predicting the niche of the *N. maculosus* observations 
 ```{r}
 dir_env <- file.path(dir_data, "env")
 
@@ -96,7 +122,7 @@ env_datasets %>%
   select(dataset_code, description, citation) %>% 
   DT::datatable()
 ```
-
+## View layers from the WorldClim and ENVIREM datasets 
 ```{r}
 # choose datasets for a vector
 env_datasets_vec <- c("WorldClim", "ENVIREM")
@@ -105,10 +131,20 @@ env_datasets_vec <- c("WorldClim", "ENVIREM")
 env_layers <- sdmpredictors::list_layers(env_datasets_vec)
 DT::datatable(env_layers)
 ```
-
+## Select appropriate layers 
+- WorldClim: 
+  - annual mean temperature
+  - annual precipitation 
+- ENVIREM
+  - climatic moisture index
+  - topographic wetness 
+- map the environmental layers on a global scale 
 ```{r}
 # choose layers after some inspection and perhaps consulting literature
-env_layers_vec <- c("WC_alt", "WC_bio1", "WC_bio2", "ER_tri", "ER_topoWet")
+env_layers_vec <- c("WC_bio1", #annual mean temp 
+                    "WC_bio12", #annual precipitation 
+                    "ER_climaticMoistureIndex", #climatic moisture index 
+                    "ER_topoWet") #topographic wetness
 
 # get layers
 env_stack <- load_layers(env_layers_vec)
@@ -117,6 +153,7 @@ env_stack <- load_layers(env_layers_vec)
 mapview(env_stack, hide = T)
 ```
 
+## Create a convex hull to crop the environmental layers to the area of interest 
 ```{r}
 obs_hull_geo <- file.path(dir_data, "obs_hull.geojson")
 
@@ -124,8 +161,7 @@ obs_hull_geo <- file.path(dir_data, "obs_hull.geojson")
 obs_hull <- sf::st_convex_hull(st_union(obs))
 
 # show points on map
-mapview(
-  list(obs, obs_hull))
+mapview(list(obs, obs_hull))
 ```
 
 ```{r}
@@ -142,6 +178,7 @@ mapview(obs) +
 ```
 
 # Pseudo-Absence
+
 ```{r}
 absence_geo <- file.path(dir_data, "absence.geojson")
 pts_geo     <- file.path(dir_data, "pts.geojson")
@@ -154,7 +191,7 @@ r_obs <- rasterize(
 mapview(obs) + 
   mapview(r_obs)
 ```
-
+## Create a mask 
 ```{r}
 # create mask for 
 r_mask <- mask(env_stack[[1]] > -Inf, r_obs, inverse=T)
@@ -166,9 +203,8 @@ absence <- dismo::randomPoints(r_mask, nrow(obs)) %>%
 mapview(obs, col.regions = "green") + 
   mapview(absence, col.regions = "gray")
 ```
-
+## Combine presence and absence into single set of labeled points
 ```{r}
-# combine presence and absence into single set of labeled points 
 pts <- rbind(
   obs %>% 
     mutate(
@@ -201,12 +237,17 @@ pts_env <- raster::extract(env_stack, as_Spatial(pts), df=TRUE) %>%
 write_csv(pts_env, pts_env_csv)
 ```
 
+# Display a table of data that will feed into the species distribution model 
+- Y is the present column where 1 = present and 0 = absent 
+- X is all other columns (the environmental layers)
 ```{r}
 pts_env %>% 
   select(-ID) %>% 
   DT::datatable()
 ```
-# Term Plots 
+
+# Term Plots
+
 ```{r}
 pts_env %>% 
   select(-ID) %>% 
@@ -224,4 +265,3 @@ pts_env %>%
     legend.position = c(1, 0),
     legend.justification = c(1, 0))
 ```
-
