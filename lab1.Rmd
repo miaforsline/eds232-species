@@ -12,9 +12,10 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, 
-                      message = FALSE,
-                      warning = FALSE)
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE, 
+                      warning = FALSE, 
+                      include = TRUE)
 ```
 
 # Learning Objectives: 
@@ -48,6 +49,7 @@ dir.create(dir_data, showWarnings = F)
 ![Source: http://www.biokids.umich.edu/critters/Necturus_maculosus/pictures/resources/contributors/Grzimek_herps/Proteidae/Necturus_maculosus/](mudpup.jpeg)
 
 ![Source: https://www.brainerddispatch.com/sports/2795363-DNR-Report-all-endangered-mudpuppy-salamanders-die-offs](mudpup2.jpeg)
+
 ## Retrieve species occurrence data from GBIF 
 - retrieve only observations with latitude and longitude coordinates
 - there are 1,205 *N. maculosus* observations 
@@ -64,13 +66,16 @@ obs_geo <- file.path(dir_data, "obs.geojson")
 
 ## Extract and clean data from the GBIF retrieval results 
 - keep only *N. maculosus* observation  points 
+- keep only relevant column information 
 - remove duplicate observations 
 - after cleaning, there are 776 *N. maculosus* observation  points 
 ```{r}
 df <- res$gbif$data[[1]]
 df_clean <- df %>% 
   filter(name %in% c("Necturus maculosus (Rafinesque, 1818)", "Necturus maculosus maculosus")) %>% #remove weirdly named points
-  filter(longitude < 0) #remove one observation in Europe 
+  filter(longitude < 0) %>% #remove one observation in Europe 
+  select(c("name", "longitude", "latitude", "key", "lifeStage", "stateProvince", "year"))
+  
 nrow(df_clean)# number of rows
 
 dups2 <- duplicated(df_clean[, c('longitude', 'latitude')])
@@ -93,7 +98,7 @@ readr::write_csv(df_clean, obs_csv)
 geojsonio::geojson_write(obs, obs_geo, file = "obs.geojson")
 
 # show points on map
-#mapview::mapview(obs, map.types = "Stamen.Watercolor")
+mapview::mapview(obs, map.types = "Stamen.Watercolor")
 ```
 
 **Question 1.** How many observations total are in GBIF for your species? 
