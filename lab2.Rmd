@@ -170,4 +170,3 @@ plot(y_predict, main='Maxent, raw prediction')
 data(wrld_simpl, package="maptools")
 plot(wrld_simpl, add=TRUE, border='dark grey')
 ```
-
