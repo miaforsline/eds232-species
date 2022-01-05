@@ -1,0 +1,69 @@
+---
+title: "Lab 2: Logistic Regression"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: flatly
+    code_folding: show
+    toc: true
+    toc_float: true
+    number_sections: true 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE, 
+                      warning = FALSE, 
+                      include = TRUE)
+```
+
+# Learning Objectives - Explore 
+Exploratory Data Analysis (cont’d):
+- Pairs plot to show correlation between variables and avoid multicollinearity (see 8.2 Many predictors in a model)
+Logistic Regression seen as an evolution of techniques
+- Linear Model to show simplest multivariate regression, but predictions can be outside the binary values.
+- Generalized Linear Model uses a logit transformation to constrain the outputs to being within two values.
+- Generalized Additive Model allows for “wiggle” in predictor terms.
+- Maxent (Maximum Entropy) is a presence-only modeling technique that allows for a more complex set of shapes between predictor and response.
+
+# Load packages and environmental data layers  
+```{r}
+librarian::shelf(
+  DT, dplyr, dismo, GGally, here, readr, tidyr)
+select <- dplyr::select # overwrite raster::select
+options(readr.show_col_types = F)
+
+dir_data    <- here("data")
+pts_env_csv <- file.path(dir_data, "pts_env.csv")
+
+pts_env <- read_csv(pts_env_csv)
+nrow(pts_env)
+```
+
+## Displate environmental data in a table 
+```{r}
+datatable(pts_env, rownames = F)
+```
+## Use `GGally` to look at pair plots and examine correlations between environmental variables 
+```{r}
+GGally::ggpairs(
+  select(pts_env, -ID),
+  aes(color = factor(present)))
+```
+# Logistic Regression 
+## Setup Data 
+- drop rows of data with any NA values (later, we'll learn how to impute values)
+- remove terms we don't want to model 
+```{r}
+d <- pts_env %>% 
+  select(-ID) %>%  # remove terms we don't want to model
+  tidyr::drop_na() # drop the rows with NA values
+nrow(d)
+```
+
+## Linear Model 
+```{r}
+
+```
+
+

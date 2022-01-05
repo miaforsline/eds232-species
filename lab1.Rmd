@@ -57,12 +57,36 @@ dir.create(dir_data, showWarnings = F)
 ```{r}
 obs_csv <- file.path(dir_data, "obs.csv")
 obs_geo <- file.path(dir_data, "obs.geojson")
+redo    <- FALSE
 
 (res <- spocc::occ(
-  query = 'Necturus maculosus', 
+  query = 'Necturus maculosus',
   from = 'gbif',
   limit = 10000,
   has_coords = T))
+
+# if (!file.exists(obs_geo) | redo){
+#   (res <- spocc::occ(
+#     query = 'Necturus maculosus', 
+#     from = 'gbif', 
+#     limit = 10000,
+#     has_coords = T))
+#   
+#   # extract data frame from result
+#   df <- res$gbif$data[[1]] 
+#   readr::write_csv(df, obs_csv)
+#   
+#   # convert to points of observation from lon/lat columns in data frame
+#   obs <- df %>% 
+#     sf::st_as_sf(
+#       coords = c("longitude", "latitude"),
+#       crs = st_crs(4326)) %>% 
+#     select(prov, key) # save space (joinable from obs_csv)
+#   sf::write_sf(obs, obs_geo, delete_dsn=T)
+# }
+# 
+# obs <- sf::read_sf(obs_geo)
+# nrow(obs) # number of rows
 ```
 
 ## Extract and clean data from the GBIF retrieval results 
@@ -184,7 +208,6 @@ mapview(obs) +
 ```
 
 # Pseudo-Absence
-
 ```{r}
 absence_geo <- file.path(dir_data, "absence.geojson")
 pts_geo     <- file.path(dir_data, "pts.geojson")
@@ -197,6 +220,7 @@ r_obs <- rasterize(
 mapview(obs) + 
   mapview(r_obs)
 ```
+
 ## Create a mask 
 ```{r}
 # create mask for 
@@ -209,6 +233,7 @@ absence <- dismo::randomPoints(r_mask, nrow(obs)) %>%
 mapview(obs, col.regions = "green") + 
   mapview(absence, col.regions = "gray")
 ```
+
 ## Combine presence and absence into single set of labeled points
 ```{r}
 pts <- rbind(
@@ -253,7 +278,7 @@ pts_env %>%
 ```
 
 # Term Plots
-
+- density histogram where density is on the y axis 
 ```{r}
 pts_env %>% 
   select(-ID) %>% 
