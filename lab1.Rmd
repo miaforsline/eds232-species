@@ -53,76 +53,57 @@ dir.create(dir_data, showWarnings = F)
 
 ## Retrieve species occurrence data from GBIF 
 - retrieve only observations with latitude and longitude coordinates
-- there are 1,205 *N. maculosus* observations 
+- there are 1,205 *N. maculosus* observations in total 
+- Extract and clean data from the GBIF retrieval results 
+  - keep only *N. maculosus* observation  points 
+  - keep only relevant column information 
+  - remove duplicate observations 
+  - after cleaning, there are 776 *N. maculosus* observation  points 
+- Use longitude and latitude to create points of observation and put them in a data frame 
+  - add CRS 4326 
 ```{r}
 obs_csv <- file.path(dir_data, "obs.csv")
 obs_geo <- file.path(dir_data, "obs.geojson")
 redo    <- FALSE
 
-(res <- spocc::occ(
-  query = 'Necturus maculosus',
-  from = 'gbif',
-  limit = 10000,
-  has_coords = T))
+if (!file.exists(obs_geo) | redo){
+  (res <- spocc::occ(
+    query = 'Necturus maculosus',
+    from = 'gbif',
+    limit = 10000,
+    has_coords = T))
 
-# if (!file.exists(obs_geo) | redo){
-#   (res <- spocc::occ(
-#     query = 'Necturus maculosus', 
-#     from = 'gbif', 
-#     limit = 10000,
-#     has_coords = T))
-#   
-#   # extract data frame from result
-#   df <- res$gbif$data[[1]] 
-#   readr::write_csv(df, obs_csv)
-#   
-#   # convert to points of observation from lon/lat columns in data frame
-#   obs <- df %>% 
-#     sf::st_as_sf(
-#       coords = c("longitude", "latitude"),
-#       crs = st_crs(4326)) %>% 
-#     select(prov, key) # save space (joinable from obs_csv)
-#   sf::write_sf(obs, obs_geo, delete_dsn=T)
-# }
-# 
-# obs <- sf::read_sf(obs_geo)
-# nrow(obs) # number of rows
-```
-
-## Extract and clean data from the GBIF retrieval results 
-- keep only *N. maculosus* observation  points 
-- keep only relevant column information 
-- remove duplicate observations 
-- after cleaning, there are 776 *N. maculosus* observation  points 
-```{r}
-df <- res$gbif$data[[1]]
-df_clean <- df %>% 
+  # extract data frame from result
+  df <- res$gbif$data[[1]]
+  
+  #clean the data 
+  df_clean <- df %>% 
   filter(name %in% c("Necturus maculosus (Rafinesque, 1818)", "Necturus maculosus maculosus")) %>% #remove weirdly named points
   filter(longitude < 0) %>% #remove one observation in Europe 
   select(c("name", "longitude", "latitude", "key", "lifeStage", "stateProvince", "year"))
   
-nrow(df_clean)# number of rows
+  #remove duplicates 
+  dups2 <- duplicated(df_clean[, c('longitude', 'latitude')])
+  sum(dups2)
+  df_clean <- df_clean[!dups2, ]
+  
+  readr::write_csv(df_clean, obs_csv)
 
-dups2 <- duplicated(df_clean[, c('longitude', 'latitude')])
-sum(dups2)
-df_clean <- df_clean[!dups2, ]
-nrow(df_clean)
+  # convert to points of observation from lon/lat columns in data frame
+  obs <- df_clean %>%
+    sf::st_as_sf(
+      coords = c("longitude", "latitude"),
+      crs = st_crs(4326))
+  
+  sf::write_sf(obs, obs_geo, delete_dsn=T)
+}
+
+obs <- sf::read_sf(obs_geo)
+nrow(obs) # number of rows
 ```
 
-## Use longitude and latitude to create points of observation and put them in a data frame 
-- add CRS 4326 
-- map the points 
+## Map the points 
 ```{r}
-obs <- df_clean %>% 
-  sf::st_as_sf(
-    coords = c("longitude", "latitude"),
-    crs = st_crs(4326))
-
-readr::write_csv(df_clean, obs_csv)
-#sf::write_sf(obs, obs_geo)
-geojsonio::geojson_write(obs, obs_geo, file = "obs.geojson")
-
-# show points on map
 mapview::mapview(obs, map.types = "Stamen.Watercolor")
 ```
 
@@ -163,17 +144,22 @@ DT::datatable(env_layers)
 ```
 ## Select appropriate layers 
 - WorldClim: 
+  - altitude 
   - annual mean temperature
   - annual precipitation 
 - ENVIREM
   - climatic moisture index
+  - terrain roughness index 
   - topographic wetness 
 - map the environmental layers on a global scale 
 ```{r}
 # choose layers after some inspection and perhaps consulting literature
-env_layers_vec <- c("WC_bio1", #annual mean temp 
+env_layers_vec <- c("WC_alt", #altitude 
+                    "WC_bio1", #annual mean temp 
+                    "WC_bio4", #temperature seasonality 
                     "WC_bio12", #annual precipitation 
                     "ER_climaticMoistureIndex", #climatic moisture index 
+                    "ER_tri", #terrain roughness index 
                     "ER_topoWet") #topographic wetness
 
 # get layers
@@ -184,97 +170,132 @@ mapview(env_stack, hide = T)
 ```
 
 ## Create a convex hull to crop the environmental layers to the area of interest 
+- map the convex hull 
 ```{r}
-obs_hull_geo <- file.path(dir_data, "obs_hull.geojson")
+obs_hull_geo  <- file.path(dir_data, "obs_hull.geojson")
+env_stack_grd <- file.path(dir_data, "env_stack.grd")
 
-# make convex hull around points of observation
-obs_hull <- sf::st_convex_hull(st_union(obs))
+if (!file.exists(obs_hull_geo) | redo){
+  # make convex hull around points of observation
+  obs_hull <- sf::st_convex_hull(st_union(obs))
+  
+  # save obs hull
+  write_sf(obs_hull, obs_hull_geo)
+}
+obs_hull <- read_sf(obs_hull_geo)
 
-# show points on map
 mapview(list(obs, obs_hull))
 ```
 
+## Create and map the environmental raster
 ```{r}
-# save obs hull
-write_sf(obs_hull, obs_hull_geo)
+if (!file.exists(env_stack_grd) | redo){
+  obs_hull_sp <- sf::as_Spatial(obs_hull)
+  env_stack <- raster::mask(env_stack, obs_hull_sp) %>% 
+    raster::crop(extent(obs_hull_sp))
+  writeRaster(env_stack, env_stack_grd, overwrite=T)  
+}
+env_stack <- stack(env_stack_grd)
 
-obs_hull_sp <- sf::as_Spatial(obs_hull)
-
-env_stack <- raster::mask(env_stack, obs_hull_sp) %>% 
-  raster::crop(extent(obs_hull_sp))
-
-mapview(obs) + 
-  mapview(env_stack, hide = T)
+# show map
+# mapview(obs) + 
+#   mapview(env_stack, hide = T) # makes html too big for Github
+plot(env_stack, nc=2)
 ```
 
 # Pseudo-Absence
+- count observations in the raster
+- create a mask 
+- generate random pseudo-absence points inside the mask 
+- map the presence and pseudo-absence points 
 ```{r}
 absence_geo <- file.path(dir_data, "absence.geojson")
 pts_geo     <- file.path(dir_data, "pts.geojson")
 pts_env_csv <- file.path(dir_data, "pts_env.csv")
 
-# get raster count of observations
-r_obs <- rasterize(
-  sf::as_Spatial(obs), env_stack[[1]], field=1, fun='count')
+# # get raster count of observations
+# r_obs <- rasterize(
+#   sf::as_Spatial(obs), env_stack[[1]], field=1, fun='count')
+# 
+# mapview(obs) + 
+#   mapview(r_obs)
 
-mapview(obs) + 
-  mapview(r_obs)
-```
+if (!file.exists(absence_geo) | redo){
+  # get raster count of observations
+  r_obs <- rasterize(
+    sf::as_Spatial(obs), env_stack[[1]], field=1, fun='count')
+  
+  # show map
+  # mapview(obs) + 
+  #   mapview(r_obs)
+  
+  # create mask for 
+  r_mask <- mask(env_stack[[1]] > -Inf, r_obs, inverse=T)
+  
+  # generate random points inside mask
+  absence <- dismo::randomPoints(r_mask, nrow(obs)) %>% 
+    as_tibble() %>% 
+    st_as_sf(coords = c("x", "y"), crs = 4326)
+  
+  write_sf(absence, absence_geo, delete_dsn=T)
+}
+absence <- read_sf(absence_geo)
 
-## Create a mask 
-```{r}
-# create mask for 
-r_mask <- mask(env_stack[[1]] > -Inf, r_obs, inverse=T)
-
-absence <- dismo::randomPoints(r_mask, nrow(obs)) %>% 
-  as_tibble() %>% 
-  st_as_sf(coords = c("x", "y"), crs = 4326)
-
+# show map of presence, ie obs, and absence
 mapview(obs, col.regions = "green") + 
   mapview(absence, col.regions = "gray")
 ```
 
+
 ## Combine presence and absence into single set of labeled points
+- display a table of all labeled data points that will feed into the species distribution model 
+  - Y is the present column where 1 = present and 0 = absent 
+  - X is all other columns (the environmental layers)
 ```{r}
-pts <- rbind(
-  obs %>% 
+if (!file.exists(pts_env_csv) | redo){
+
+  # combine presence and absence into single set of labeled points 
+  pts <- rbind(
+    obs %>% 
+      mutate(
+        present = 1) %>% 
+      select(present, key),
+    absence %>% 
+      mutate(
+        present = 0,
+        key     = NA)) %>% 
     mutate(
-      present = 1) %>% 
-    select(present),
-  absence %>% 
+      ID = 1:n()) %>% 
+    relocate(ID)
+  write_sf(pts, pts_geo, delete_dsn=T)
+
+  # extract raster values for points
+  pts_env <- raster::extract(env_stack, as_Spatial(pts), df=TRUE) %>% 
+    tibble() %>% 
+    # join present and geometry columns to raster value results for points
+    left_join(
+      pts %>% 
+        select(ID, present),
+      by = "ID") %>% 
+    relocate(present, .after = ID) %>% 
+    # extract lon, lat as single columns
     mutate(
-      present = 0)) %>% 
-  mutate(
-    ID = 1:n()) %>% 
-  relocate(ID)
-write_sf(pts, pts_geo)
+      #present = factor(present),
+      lon = st_coordinates(geometry)[,1],
+      lat = st_coordinates(geometry)[,2]) %>% 
+    select(-geometry)
+  write_csv(pts_env, pts_env_csv)
+}
+pts_env <- read_csv(pts_env_csv)
 
-# extract raster values for points
-pts_env <- raster::extract(env_stack, as_Spatial(pts), df=TRUE) %>% 
-  tibble() %>% 
-  # join present and geometry columns to raster value results for points
-  left_join(
-    pts %>% 
-      select(ID, present),
-    by = "ID") %>% 
-  relocate(present, .after = ID) %>% 
-  # extract lon, lat as single columns
-  mutate(
-    #present = factor(present),
-    lon = st_coordinates(geometry)[,1],
-    lat = st_coordinates(geometry)[,2]) %>% 
-  select(-geometry)
-
-write_csv(pts_env, pts_env_csv)
-```
-
-# Display a table of data that will feed into the species distribution model 
-- Y is the present column where 1 = present and 0 = absent 
-- X is all other columns (the environmental layers)
-```{r}
 pts_env %>% 
-  select(-ID) %>% 
-  DT::datatable()
+  # show first 10 presence, last 10 absence
+  slice(c(1:10, (nrow(pts_env)-9):nrow(pts_env))) %>% 
+  DT::datatable(
+    rownames = F,
+    options = list(
+      dom = "t",
+      pageLength = 20))
 ```
 
 # Term Plots
