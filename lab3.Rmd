@@ -1,0 +1,132 @@
+---
+title: "Lab 1c. Species Distribution Modeling - Decision Trees"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: flatly
+    code_folding: show
+    toc: true
+    toc_float: true
+    number_sections: true 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE, 
+                      warning = FALSE, 
+                      include = TRUE,
+                      quiet = TRUE)
+```
+
+# Learning Objectives 
+
+# Load packages
+- set options 
+- set graph theme
+- establish paths 
+
+```{r}
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+
+librarian::shelf(
+  caret,       # m: modeling framework
+  dplyr, ggplot2 ,here, readr, 
+  pdp,         # X: partial dependence plots
+  rpart,       # m: recursive partition modeling
+  rpart.plot,  # m: recursive partition plotting
+  rsample,     # d: split train/test data
+  skimr,       # d: skim summarize data table
+  vip)         # X: variable importance
+
+options(
+  scipen = 999,
+  readr.show_col_types = F)
+set.seed(42)
+
+ggplot2::theme_set(ggplot2::theme_light())
+
+dir_data    <- here("data")
+pts_env_csv <- file.path(dir_data, "pts_env.csv")
+```
+
+
+# Decision Trees 
+- read in data 
+- clean data 
+- change presence data to a factor 
+- drop rows with NA values 
+```{r}
+pts_env <- read_csv(pts_env_csv)
+
+d <- pts_env %>% 
+  select(-ID) %>%                   # not used as a predictor x
+  mutate(
+    present = factor(present)) %>%  # categorical response
+  na.omit()                         # drop rows with NA
+
+skim(d)
+```
+
+## Split data into training and test 
+- use 80% of the data to create a training data set 
+- use 20% of the data to create a testing data set 
+```{r}
+d_split  <- rsample::initial_split(d, prop = 0.8, strata = "present")
+d_train  <- rsample::training(d_split)
+
+# show number of rows present is 0 vs 1
+table(d$present)
+
+table(d_train$present)
+```
+## Partition, depth = 1 
+- run decision stump model 
+```{r}
+mod <- rpart(
+  present ~ ., data = d_train, 
+  control = list(
+    cp = 0, minbucket = 5, maxdepth = 1))
+mod
+
+# plot tree 
+par(mar = c(1, 1, 1, 1))
+rpart.plot(mod)
+```
+## Partition, depth = default 
+```{r}
+mod <- rpart(present ~ ., data = d_train)
+mod
+
+rpart.plot(mod)
+
+# plot complexity parameter
+plotcp(mod)
+
+# rpart cross validation results
+mod$cptable
+```
+
+## Feature Interpretation 
+- caret cross validation results
+```{r}
+mdl_caret <- train(
+  present ~ .,
+  data       = d_train,
+  method     = "rpart",
+  trControl  = trainControl(method = "cv", number = 10),
+  tuneLength = 20)
+
+ggplot(mdl_caret)
+```
+
+```{r}
+vip(mdl_caret, num_features = 40, bar = FALSE)
+```
+
+```{r}
+
+```
+

@@ -33,6 +33,8 @@ if (!require(librarian)){
   install.packages("librarian")
   library(librarian)
 }
+#librarian::lib_paths("/Users/bbest/R/x86_64-pc-linux-gnu-library/4.0")
+
 librarian::shelf(
   dismo, dplyr, DT, ggplot2, here, htmltools, leaflet, mapview, purrr, raster, readr, rgbif, rgdal, rJava, sdmpredictors, sf, spocc, tidyr)
 select <- dplyr::select # overwrite raster::select
