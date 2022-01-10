@@ -127,6 +127,14 @@ vip(mdl_caret, num_features = 40, bar = FALSE)
 ```
 
 ```{r}
+# Construct partial dependence plots
+p1 <- partial(mdl_caret, pred.var = "lat") %>% autoplot()
+p2 <- partial(mdl_caret, pred.var = "WC_bio1") %>% autoplot()
+p3 <- partial(mdl_caret, pred.var = c("lat", "WC_bio1")) %>% 
+  plotPartial(levelplot = FALSE, zlab = "yhat", drape = TRUE, 
+              colorkey = TRUE, screen = list(z = -20, x = -60))
 
+# Display plots side by side
+gridExtra::grid.arrange(p1, p2, p3, ncol = 3)
 ```
 
