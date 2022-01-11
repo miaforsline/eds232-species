@@ -19,15 +19,16 @@ knitr::opts_chunk$set(echo = TRUE,
 ```
 
 # Learning Objectives 
-- explore Supervised Classification for categorical values, which is a Classification 
-  - Supervised Classification for continuous values is a Regression 
+- explore Supervised Classification for categorical values
+  - this is considered a Classification, while Supervised Classification for continuous values is called a Regression 
 - use Decision Trees as a Classification technique to classify categorical species presence and absence data
   - specifically, use Recursive Partitioning and Random Forest techniques
 
-# Load packages
-- set options 
-- set `ggplot` graph theme
-- establish directory paths 
+# Set Up
+- load packages
+- set options
+- select `ggplot` graph theme
+- establish directory and file paths for the data 
 
 ```{r}
 if (!require(librarian)){
@@ -69,8 +70,7 @@ pts_env <- read_csv(pts_env_csv)
 
 d <- pts_env %>% 
   select(-ID) %>%                   # not used as a predictor x
-  mutate(
-    present = factor(present)) %>%  # categorical response
+  mutate(present = factor(present)) %>%  # categorical response
   na.omit()                         # drop rows with NA
 
 skim(d)
@@ -80,13 +80,13 @@ skim(d)
 - use 80% of the data to create a training data set 
 - use 20% of the data to create a testing data set 
 - view how many presence and absence data points are in each set 
+  - present: 1
+  - absent: 0
 ```{r}
 d_split  <- rsample::initial_split(d, prop = 0.8, strata = "present")
 d_train  <- rsample::training(d_split)
 
-# show number of rows present is 0 vs 1
 table(d$present)
-
 table(d_train$present)
 ```
 ## Partition, depth = 1 
@@ -133,10 +133,12 @@ mdl_caret <- train(
 
 ggplot(mdl_caret)
 ```
+
 ## Examine the importance of each predictor 
 ```{r}
 vip(mdl_caret, num_features = 40, bar = FALSE)
 ```
+
 # Partial dependence plots
 - construct and display plots for the 3 most important predictors 
 ```{r}
