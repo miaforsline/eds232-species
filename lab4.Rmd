@@ -78,7 +78,7 @@ pts_train_a <- pts_train %>%
 # Calibrate: Model Selection 
 - use a pairs plot to check correlation between environmental variables and assess multicollinearity issues 
 ```{r}
-pairs(env_stack)
+#pairs(env_stack)
 ```
 ## Calculate variance inflation factor per predictor, a metric of multicollinearity between variables
 ```{r}
@@ -97,7 +97,7 @@ v
 ```{r}
 env_stack_v <- usdm::exclude(env_stack, v)
 
-pairs(env_stack_v)
+#pairs(env_stack_v)
 ```
 
 ## Fit a maximum entropy model using `maxent()`
