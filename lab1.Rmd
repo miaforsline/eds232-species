@@ -1,5 +1,5 @@
 ---
-title: "Lab 1: Species Distribution Models"
+title: "Lab 1a: Species Distribution Models - Explore"
 author: "Mia Forsline"
 date: "`r Sys.Date()`"
 output: 

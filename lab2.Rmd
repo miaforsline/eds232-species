@@ -1,5 +1,5 @@
 ---
-title: "Lab 2: Logistic Regression"
+title: "Lab 1b: Species Distribution Modeling - Logistic Regression"
 date: "`r Sys.Date()`"
 output: 
   html_document:

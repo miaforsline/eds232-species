@@ -1,0 +1,64 @@
+---
+title: "Lab 1d: Species Distribution Modeling - Evaluate Models"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: flatly
+    code_folding: show
+    toc: true
+    toc_float: true
+    number_sections: true 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE, 
+                      warning = FALSE, 
+                      include = TRUE,
+                      quiet = TRUE)
+```
+
+# Learning Objectives 
+- Evaluate model performance
+- Calibrate model parameters 
+
+# Setup 
+- load packages
+  - `dismo` - species distribution modeling: `maxent()`, `predict()`, `evaluate()`
+  - `usdm` - uncertainty analysis for species distribution models: `vifcor()`
+- set options
+- set `ggplot` theme 
+- set directory paths 
+- read in the data
+  - observation points
+  - raster stack of environmental layers 
+```{r}
+librarian::shelf(
+  dismo, # species distribution modeling: maxent(), predict(), evaluate(), 
+  dplyr, ggplot2, GGally, here, maptools, readr, 
+  raster, readr, rsample, sf,
+  usdm)  # uncertainty analysis for species distribution models: vifcor()
+select = dplyr::select
+
+set.seed(42)
+options(
+  scipen = 999,
+  readr.show_col_types = F)
+ggplot2::theme_set(ggplot2::theme_light())
+
+dir_data      <- here("data")
+pts_geo       <- file.path(dir_data, "pts.geojson")
+env_stack_grd <- file.path(dir_data, "env_stack.grd")
+mdl_maxv_rds  <- file.path(dir_data, "mdl_maxent_vif.rds")
+
+# read points of observation: presence (1) and absence (0)
+pts <- read_sf(pts_geo)
+
+# read raster stack of environment
+env_stack <- raster::stack(env_stack_grd)
+```
+
+```{r}
+
+```
+
