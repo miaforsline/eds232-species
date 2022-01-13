@@ -99,15 +99,34 @@ env_stack_v <- usdm::exclude(env_stack, v)
 
 pairs(env_stack_v)
 ```
+
 ## Fit a maximum entropy model using `maxent()`
 - plot variable contributions per predictor
 ```{r}
+
+pts_train_test <- pts_train %>% 
+  select(present, geometry)
+
 if (!file.exists(mdl_maxv_rds)){
-  mdl_maxv <- maxent(env_stack_v, pts_train)
+  mdl_maxv <- maxent(env_stack_v, pts_train_p)
   readr::write_rds(mdl_maxv, mdl_maxv_rds)
 }
 mdl_maxv <- read_rds(mdl_maxv_rds)
 
 plot(mdl_maxv)
+```
+
+## Plot term plots
+```{r}
+response(mdl_maxv)
+```
+
+## Predict 
+```{r}
+y_maxv <- predict(env_stack, mdl_maxv) #, ext=ext, progress='')
+
+plot(y_maxv, main='Maxent, raw prediction')
+data(wrld_simpl, package="maptools")
+plot(wrld_simpl, add=TRUE, border='dark grey')
 ```
 
