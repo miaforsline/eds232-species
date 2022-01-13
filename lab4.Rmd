@@ -58,7 +58,56 @@ pts <- read_sf(pts_geo)
 env_stack <- raster::stack(env_stack_grd)
 ```
 
+## Split observation data into training and testing sets
+- the training data set uses 80% of the data 
+- the testing data set uses the remaining 20% of the data 
 ```{r}
+pts_split  <- rsample::initial_split(
+  pts, prop = 0.8, strata = "present")
+pts_train  <- rsample::training(pts_split)
+pts_test   <- rsample::testing(pts_split)
 
+pts_train_p <- pts_train %>% 
+  filter(present == 1) %>% 
+  as_Spatial()
+pts_train_a <- pts_train %>% 
+  filter(present == 0) %>% 
+  as_Spatial()
+```
+
+# Calibrate: Model Selection 
+- use a pairs plot to check correlation between environmental variables and assess multicollinearity issues 
+```{r}
+pairs(env_stack)
+```
+## Calculate variance inflation factor per predictor, a metric of multicollinearity between variables
+```{r}
+vif(env_stack)
+```
+
+## Stepwise reduce predictors, based on a max correlation of 0.7
+- conduct a multicollinearity reduction using `vifcor()`
+```{r}
+v <- vifcor(env_stack, th=0.7) 
+v
+```
+
+## Reduce the environmental raster stack by excluding variables that were too correlated 
+- visualize the remaining variables with another pairs plot 
+```{r}
+env_stack_v <- usdm::exclude(env_stack, v)
+
+pairs(env_stack_v)
+```
+## Fit a maximum entropy model using `maxent()`
+- plot variable contributions per predictor
+```{r}
+if (!file.exists(mdl_maxv_rds)){
+  mdl_maxv <- maxent(env_stack_v, pts_train)
+  readr::write_rds(mdl_maxv, mdl_maxv_rds)
+}
+mdl_maxv <- read_rds(mdl_maxv_rds)
+
+plot(mdl_maxv)
 ```
 
