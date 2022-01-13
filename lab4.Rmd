@@ -51,10 +51,7 @@ pts_geo       <- file.path(dir_data, "pts.geojson")
 env_stack_grd <- file.path(dir_data, "env_stack.grd")
 mdl_maxv_rds  <- file.path(dir_data, "mdl_maxent_vif.rds")
 
-# read points of observation: presence (1) and absence (0)
 pts <- read_sf(pts_geo)
-
-# read raster stack of environment
 env_stack <- raster::stack(env_stack_grd)
 ```
 
@@ -78,8 +75,9 @@ pts_train_a <- pts_train %>%
 # Calibrate: Model Selection 
 - use a pairs plot to check correlation between environmental variables and assess multicollinearity issues 
 ```{r}
-#pairs(env_stack)
+pairs(env_stack)
 ```
+
 ## Calculate variance inflation factor per predictor, a metric of multicollinearity between variables
 ```{r}
 vif(env_stack)
@@ -97,18 +95,17 @@ v
 ```{r}
 env_stack_v <- usdm::exclude(env_stack, v)
 
-#pairs(env_stack_v)
+pairs(env_stack_v)
 ```
 
 ## Fit a maximum entropy model using `maxent()`
 - plot variable contributions per predictor
 ```{r}
-
 pts_train_test <- pts_train %>% 
   select(present, geometry)
 
 if (!file.exists(mdl_maxv_rds)){
-  mdl_maxv <- maxent(env_stack_v, pts_train_p)
+  mdl_maxv <- maxent(env_stack_v, pts_train)
   readr::write_rds(mdl_maxv, mdl_maxv_rds)
 }
 mdl_maxv <- read_rds(mdl_maxv_rds)
@@ -128,5 +125,69 @@ y_maxv <- predict(env_stack, mdl_maxv) #, ext=ext, progress='')
 plot(y_maxv, main='Maxent, raw prediction')
 data(wrld_simpl, package="maptools")
 plot(wrld_simpl, add=TRUE, border='dark grey')
+```
+
+# Evaluate 
+## Area Under the Curve (AUC), Receiver Operator Characteristic (ROC) Curve, and Confusion Matrix 
+- split the test data into presence and absence
+- use `dismo()` to calculate the AUC and max TPR + TNR
+```{r}
+pts_test_p <- pts_test %>% 
+  filter(present == 1) %>% 
+  as_Spatial()
+pts_test_a <- pts_test %>% 
+  filter(present == 0) %>% 
+  as_Spatial()
+
+y_maxv <- predict(mdl_maxv, env_stack)
+#plot(y_maxv)
+
+e <- dismo::evaluate(
+  p     = pts_test_p,
+  a     = pts_test_a, 
+  model = mdl_maxv,
+  x     = env_stack)
+e
+```
+## Plot the ROC Curve 
+- identify the threshold and mark it in blue on the plot 
+```{r}
+#plot(e, 'ROC')
+
+thr <- threshold(e)[['spec_sens']]
+thr
+```
+
+## Create the Confusion Matrix 
+```{r}
+p_true <- na.omit(extract(y_maxv, pts_test_p) >= thr)
+a_true <- na.omit(extract(y_maxv, pts_test_a) < thr)
+
+# (t)rue/(f)alse (p)ositive/(n)egative rates
+tpr <- sum(p_true)/length(p_true)
+fnr <- sum(!p_true)/length(p_true)
+fpr <- sum(!a_true)/length(a_true)
+tnr <- sum(a_true)/length(a_true)
+
+matrix(
+  c(tpr, fnr,
+    fpr, tnr), 
+  nrow=2, dimnames = list(
+    c("present_obs", "absent_obs"),
+    c("present_pred", "absent_pred")))
+```
+```{r}
+plot(e, 'ROC')
+
+thr <- threshold(e)[['spec_sens']]
+thr
+
+points(fpr, tpr, pch=23, bg="blue")
+```
+
+
+## Plot the areas where we predict *Necturus maculosus* presence 
+```{r}
+plot(y_maxv > thr)
 ```
 
