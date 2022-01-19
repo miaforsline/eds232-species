@@ -1,5 +1,6 @@
 ---
 title: "Lab 1d: Species Distribution Modeling - Evaluate Models"
+author: "Mia Forsline"
 date: "`r Sys.Date()`"
 output: 
   html_document:
