@@ -153,7 +153,7 @@ e
 ## Plot the ROC Curve 
 - identify the threshold and mark it in blue on the plot 
 ```{r}
-#plot(e, 'ROC')
+plot(e, 'ROC')
 
 thr <- threshold(e)[['spec_sens']]
 thr
