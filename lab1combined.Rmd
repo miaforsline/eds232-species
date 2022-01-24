@@ -5,10 +5,10 @@ date: "2021-01-26"
 output: 
   html_document:
     theme: flatly
-    code_folding: show
+    code_folding: hide
     toc: true
     toc_float: true
-    number_sections: true 
+    number_sections: false 
 ---
 
 # Learning Objectives:
@@ -59,11 +59,51 @@ if (!require(librarian)){
   install.packages("librarian")
   library(librarian)
 }
-#librarian::lib_paths("/Users/bbest/R/x86_64-pc-linux-gnu-library/4.0")
 
 librarian::shelf(
   dismo, dplyr, DT, ggplot2, here, htmltools, leaflet, mapview, purrr, raster, readr, rgbif, rgdal, rJava, sdmpredictors, sf, spocc, tidyr)
 select <- dplyr::select # overwrite raster::select
+
+librarian::shelf(
+  DT, dplyr, dismo, GGally, here, readr, tidyr)
+
+librarian::shelf(mgcv)
+
+librarian::shelf(
+  maptools, sf)
+
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+
+librarian::shelf(
+  caret,       # m: modeling framework
+  dplyr, ggplot2 ,here, readr, 
+  pdp,         # X: partial dependence plots
+  rpart,       # m: recursive partition modeling
+  rpart.plot,  # m: recursive partition plotting
+  rsample,     # d: split train/test data
+  skimr,       # d: skim summarize data table
+  vip)         # X: variable importance
+
+options(
+  scipen = 999,
+  readr.show_col_types = F)
+set.seed(42)
+
+ggplot2::theme_set(ggplot2::theme_light())
+
+dir_data    <- here("data")
+pts_env_csv <- file.path(dir_data, "pts_env.csv")
+
+options(readr.show_col_types = F)
+
+dir_data    <- here("data")
+pts_env_csv <- file.path(dir_data, "pts_env.csv")
+
+pts_env <- read_csv(pts_env_csv)
+#nrow(pts_env)
 
 # set random seed for reproducibility
 set.seed(42)
@@ -73,7 +113,9 @@ dir_data <- here("data")
 dir.create(dir_data, showWarnings = F)
 ```
 
-# Get species observation data for *Necturus maculosus*, the common mudpuppy salamander from GBIF
+# 1. Get species observation data for *Necturus maculosus*, the common mudpuppy salamander from GBIF
+
+## 2. Image of *N. maculosus* 
 
 ![Source: <http://www.biokids.umich.edu/critters/Necturus_maculosus/pictures/resources/contributors/Grzimek_herps/Proteidae/Necturus_maculosus/>](mudpup.jpeg)
 
@@ -96,7 +138,7 @@ dir.create(dir_data, showWarnings = F)
 
     -   add CRS 4326
 
-    ```{r}
+```{r}
     obs_csv <- file.path(dir_data, "obs.csv")
     obs_geo <- file.path(dir_data, "obs.geojson")
     redo    <- FALSE
@@ -135,19 +177,19 @@ dir.create(dir_data, showWarnings = F)
 
     obs <- sf::read_sf(obs_geo)
     nrow(obs) # number of rows
-    ```
+```
 
-## Map the distribution of points
+## 3. Map the distribution of points
 
 ```{r}
 mapview::mapview(obs, map.types = "Stamen.Watercolor")
 ```
 
-**Question 1.** How many observations total are in GBIF for your species?
+## 4. **Question 1.** How many observations total are in GBIF for your species?
 
 In total, GBIF contains 1,205 observations of *N. maculosus*.
 
-**Question 2.** Do you see any odd observations, like marine species on land or vice versa? If so, please see the Data Cleaning and explain what you did to fix or remove these points.
+## 5. **Question 2.** Do you see any odd observations, like marine species on land or vice versa? If so, please see the Data Cleaning and explain what you did to fix or remove these points.
 
 Yes, I removed observations with the incorrect species name as well as one outlier observation point located in Europe. I also removed 421 duplicate observations.
 
@@ -165,11 +207,6 @@ options(sdmpredictors_datadir = dir_env)
 
 # choosing terrestrial
 env_datasets <- sdmpredictors::list_datasets(terrestrial = TRUE, marine = FALSE)
-
-# show table of datasets
-env_datasets %>% 
-  select(dataset_code, description, citation) %>% 
-  DT::datatable()
 ```
 
 ## View layers from the WorldClim and ENVIREM datasets
@@ -180,10 +217,9 @@ env_datasets_vec <- c("WorldClim", "ENVIREM")
 
 # get layers
 env_layers <- sdmpredictors::list_layers(env_datasets_vec)
-DT::datatable(env_layers)
 ```
 
-## Select appropriate layers
+## 6. Select appropriate layers
 
 Prior work suggests that *N. maculosus* species distribution is most influenced by environmental variables not related to climate such as urban development, agriculture, tree canopy cover, and road density ([Fischer 2020](https://scholarworks.iupui.edu/handle/1805/22884)). However, other aquatic salamander species such as *Ambystoma ordinarium*, a mole salamander from Mexico, have been shown to be best predicted by WorldClim variables ([Escalera-Vásquez et al. 2018](https://doi.org/10.1655/Herpetologica-D-16-00078.1)). Furthermore, as ectotherms, salamanders are known to be sensitive to both temperature and moisture shifts ([McEntire and Maerz 2019](https://www.frontiersin.org/articles/10.3389/fevo.2019.00022/full)).
 
@@ -247,7 +283,7 @@ obs_hull <- read_sf(obs_hull_geo)
 mapview(list(obs, obs_hull))
 ```
 
-## Create and map the environmental raster
+## 7. Map the environmental raster clipped to the species range 
 
 ```{r}
 if (!file.exists(env_stack_grd) | redo){
@@ -257,14 +293,14 @@ if (!file.exists(env_stack_grd) | redo){
   writeRaster(env_stack, env_stack_grd, overwrite=T)  
 }
 env_stack <- stack(env_stack_grd)
+plot(env_stack, nc=2)
 
 # show map
 # mapview(obs) + 
 #   mapview(env_stack, hide = T) # makes html too big for Github
-plot(env_stack, nc=2)
 ```
 
-# Pseudo-Absence
+# 8. Map pseudo-absence points 
 
 -   count observations in the raster
 -   create a mask
@@ -275,13 +311,6 @@ plot(env_stack, nc=2)
 absence_geo <- file.path(dir_data, "absence.geojson")
 pts_geo     <- file.path(dir_data, "pts.geojson")
 pts_env_csv <- file.path(dir_data, "pts_env.csv")
-
-# # get raster count of observations
-# r_obs <- rasterize(
-#   sf::as_Spatial(obs), env_stack[[1]], field=1, fun='count')
-# 
-# mapview(obs) + 
-#   mapview(r_obs)
 
 if (!file.exists(absence_geo) | redo){
   # get raster count of observations
@@ -316,7 +345,7 @@ mapview(obs, col.regions = "green") +
     -   Y is the present column where 1 = present and 0 = absent
     -   X is all other columns (the environmental layers)
 
-    ```{r}
+```{r}
     if (!file.exists(pts_env_csv) | redo){
 
       # combine presence and absence into single set of labeled points 
@@ -361,9 +390,9 @@ mapview(obs, col.regions = "green") +
         options = list(
           dom = "t",
           pageLength = 20))
-    ```
+```
 
-# Term Plots
+# 9. Term plots
 
 -   density histogram where density is on the y axis
 
@@ -384,3 +413,141 @@ pts_env %>%
     legend.position = c(1, 0),
     legend.justification = c(1, 0))
 ```
+
+# Lab 2 - Logistic Regression 
+
+## 10. Use `GGally` to look at pair plots and examine correlations between environmental variables 
+```{r}
+GGally::ggpairs(
+  select(pts_env, -ID),
+  aes(color = factor(present)))
+```
+
+# Logistic Regression 
+
+## Setup Data 
+- drop rows of data with any NA values (later, we'll learn how to impute values)
+- remove terms we don't want to model 
+```{r}
+d <- pts_env %>% 
+  select(-ID) %>%  # remove terms we don't want to model
+  tidyr::drop_na() # drop the rows with NA values
+```
+
+## 11. Linear Model 
+- dependent variable Y: presence/absence, aka 1/0
+- independent variables X: everything else in the dataframe, aka the environmental layers 
+```{r}
+mod <- lm(present ~ ., data = d)
+```
+
+Note: a linear model is ineffective because it predicts values outside the 0 - 1 range
+```{r}
+y_predict <- predict(mod, d, type="response")
+y_true    <- d$present
+
+range(y_predict)
+range(y_true)
+```
+
+# 12. Generalized Linear Model
+
+To solve this problem, we will apply a Logit Transformation 
+```{r}
+# fit a generalized linear model with a binomial logit link function
+mod <- glm(present ~ ., family = binomial(link="logit"), data = d)
+```
+
+Note: we are not within the 0 - 1 range we want to be in
+```{r}
+y_predict <- predict(mod, d, type="response")
+range(y_predict)
+```
+
+## 13. GLM Term Plots 
+```{r}
+termplot(mod, partial.resid = TRUE, se = TRUE, main = F)
+```
+
+# 14. Generalized Additive Model (GAM)
+We can further improve the GLM by adding "wiggle" to the relationship between the predictor and response variables 
+```{r}
+# fit a generalized additive model with smooth predictors
+mod <- mgcv::gam(
+  formula = present ~ s(WC_alt) + 
+                      s(WC_bio1) + 
+                      s(WC_bio2) +
+                      s(WC_bio4) +
+                      s(WC_bio6) + 
+                      s(WC_bio12) +
+                      s(WC_bio14) + 
+                      s(ER_climaticMoistureIndex) + 
+                      s(ER_tri) + 
+                      s(ER_topoWet) + 
+                      s(lon) + 
+                      s(lat), 
+  family = binomial, data = d)
+summary(mod)
+```
+
+## 15. GAM Term Plots 
+```{r}
+plot(mod, scale=0)
+```
+
+## 16. **Question:** Which GAM environmental variables, and even range of values, seem to contribute most towards presence (above 0 response) versus absence (below 0 response)?
+
+Annual Precipitation (`WC_bio12`) and Longitude (`lon`) were the most statistically significant in the GAM model (p-value <<< 0). The Climatic Moisture Index (`ER_climaticMoistureIndex`),  Terrain Roughness Index (`ER_tri`), and latitude (`lat`) were the next most statistically significant variables in the GAM model (p-value < 0.001).
+
+# 17. Maxent (Max Entropy)
+This is the most commonly used species distribution model because it requires few input data points, all of which can be presence observation points, and is easy to use with a Java GUI. 
+```{r}
+# show version of maxent
+#maxent()
+```
+
+```{r}
+# get environmental rasters
+# NOTE: the first part of Lab 1. SDM - Explore got updated to write this clipped environmental raster stack
+env_stack_grd <- file.path(dir_data, "env_stack.grd")
+env_stack <- stack(env_stack_grd)
+plot(env_stack, nc=2)
+```
+
+```{r}
+# get presence-only observation points (maxent extracts raster values for you)
+obs_geo <- file.path(dir_data, "obs.geojson")
+obs_sp <- read_sf(obs_geo) %>% 
+  sf::as_Spatial() # maxent prefers sp::SpatialPoints over newer sf::sf class
+
+# fit a maximum entropy model
+mod <- maxent(env_stack, obs_sp)
+```
+
+## 18. Maxent variable contribution plot 
+- plot variable contributions per predictor
+```{r}
+plot(mod)
+```
+
+# 19. Maxent Term Plots 
+```{r}
+response(mod)
+```
+
+## 20. **Question:** Which Maxent environmental variables, and even range of values, seem to contribute most towards presence (closer to 1 response) and how might this differ from the GAM results?
+
+Annual precipitation (`WC_bio12`) < 600 and annual precipitation > 1100, Terrain Roughness Index (`ER_tri`) > 100, and minimum temperature (`WC_bio6`) < -35 and WC_bio6 > 5 all seem to demonstrate fairly high predicted values. This is fewer variables than the GAM model, but there is overlap with annual precipitation and the Terrain Roughness Index. However, minimum temperature was not suggested by the GAM model. 
+
+## Predict 
+```{r}
+# predict
+y_predict <- predict(env_stack, mod) #, ext=ext, progress='')
+
+plot(y_predict, main='Maxent, raw prediction')
+data(wrld_simpl, package="maptools")
+plot(wrld_simpl, add=TRUE, border='dark grey')
+```
+
+# Lab 3 - Decision Trees 
+
