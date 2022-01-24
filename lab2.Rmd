@@ -20,6 +20,7 @@ knitr::opts_chunk$set(echo = TRUE,
 ```
 
 # Learning Objectives - Explore 
+
 Exploratory Data Analysis (cont’d):
 - Pairs plot to show correlation between variables and avoid multicollinearity (see 8.2 Many predictors in a model)
 Logistic Regression seen as an evolution of techniques
