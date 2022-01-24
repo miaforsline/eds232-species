@@ -185,15 +185,19 @@ DT::datatable(env_layers)
 
 ## Select appropriate layers
 
-Prior work suggests that *N. maculosus* species distribution is most influenced by environmental variables not related to climate such as urban development, agriculture, tree canopy cover, and road density ([Fischer 2020](https://scholarworks.iupui.edu/handle/1805/22884)). However, other aquatic salamander species such as *Ambystoma ordinarium*, a mole salamander from Mexico, have been shown to be best predicted by WorldClim variables ([Escalera-Vásquez et al. 2018](https://doi.org/10.1655/Herpetologica-D-16-00078.1)). Furthermore, as ectotherms, salamanders are known to be sensitive to both temperature and moisture shifts ([McEntire and Maerz 2019](https://www.frontiersin.org/articles/10.3389/fevo.2019.00022/full)). 
+Prior work suggests that *N. maculosus* species distribution is most influenced by environmental variables not related to climate such as urban development, agriculture, tree canopy cover, and road density ([Fischer 2020](https://scholarworks.iupui.edu/handle/1805/22884)). However, other aquatic salamander species such as *Ambystoma ordinarium*, a mole salamander from Mexico, have been shown to be best predicted by WorldClim variables ([Escalera-Vásquez et al. 2018](https://doi.org/10.1655/Herpetologica-D-16-00078.1)). Furthermore, as ectotherms, salamanders are known to be sensitive to both temperature and moisture shifts ([McEntire and Maerz 2019](https://www.frontiersin.org/articles/10.3389/fevo.2019.00022/full)).
 
-![Ambystoma ordinarium, also known as the Michoacan stream salamander or the Puerto Hondo stream salaamnder, is native to the Mexican state of Michoacan. Photo source: https://calphotos.berkeley.edu/cgi/img_query?enlarge=0000+0000+0918+1919.](ambystoma.jpeg)
+![Ambystoma ordinarium, also known as the Michoacan stream salamander or the Puerto Hondo stream salaamnder, is native to the Mexican state of Michoacan. Photo source: <https://calphotos.berkeley.edu/cgi/img_query?enlarge=0000+0000+0918+1919>.](ambystoma.jpeg)
 
 -   WorldClim:
 
     -   altitude
     -   annual mean temperature
+    -   mean diurnal temperature range
+    -   temperature seasonality
+    -   minimum temperature of the coldest month
     -   annual precipitation
+    -   precipitation of the driest month
 
 -   ENVIREM
 
@@ -207,8 +211,11 @@ Prior work suggests that *N. maculosus* species distribution is most influenced 
 # choose layers after some inspection and perhaps consulting literature
 env_layers_vec <- c("WC_alt", #altitude 
                     "WC_bio1", #annual mean temp 
+                    "WC_bio2", #mean diurnal temp range 
                     "WC_bio4", #temperature seasonality 
+                    "WC_bio6", #minimum temperature of the coldest month 
                     "WC_bio12", #annual precipitation 
+                    "WC_bio14", #precipitation of the driest month 
                     "ER_climaticMoistureIndex", #climatic moisture index 
                     "ER_tri", #terrain roughness index 
                     "ER_topoWet") #topographic wetness
