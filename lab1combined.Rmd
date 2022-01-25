@@ -13,7 +13,7 @@ output:
 
 # Learning Objectives:
 
-## Lab 1a - Explore
+**Lab 1a - Explore**
 
 -   Fetch species observations from the Global Biodiversity Information Facility (GBIF.org) using an R package that wraps a function around their API.
 -   Fetch environmental data for defining environmental relationship in the species distribution model (SDM).
@@ -21,7 +21,7 @@ output:
 -   Extract underlying environmental data from points.
 -   Plot term plots of each environmental predictor with the species response.
 
-## Lab 1b - Logistic Regression
+**Lab 1b - Logistic Regression**
 
 -   Pairs plot to show correlation between variables and avoid multicollinearity (see 8.2 Many predictors in a model) Logistic Regression seen as an evolution of techniques
 -   Linear Model to show simplest multivariate regression, but predictions can be outside the binary values.
@@ -29,7 +29,7 @@ output:
 -   Generalized Additive Model allows for "wiggle" in predictor terms.
 -   Maxent (Maximum Entropy) is a presence-only modeling technique that allows for a more complex set of shapes between predictor and response.
 
-## Lab 1c - Decision Trees
+**Lab 1c - Decision Trees**
 
 -   explore Supervised Classification for categorical values
 
@@ -39,7 +39,7 @@ output:
 
     -   specifically, use Recursive Partitioning and Random Forest techniques
 
-## Lab 1d - Evaluate the model
+**Lab 1d - Evaluate the model**
 
 -   Evaluate model performance
 -   Calibrate model parameters
@@ -111,9 +111,34 @@ set.seed(42)
 # directory to store data
 dir_data <- here("data")
 dir.create(dir_data, showWarnings = F)
+
+library(ranger)
+
+librarian::shelf(
+  dismo, # species distribution modeling: maxent(), predict(), evaluate(), 
+  dplyr, ggplot2, GGally, here, maptools, readr, 
+  raster, readr, rsample, sf,
+  usdm)  # uncertainty analysis for species distribution models: vifcor()
+select = dplyr::select
+
+set.seed(42)
+options(
+  scipen = 999,
+  readr.show_col_types = F)
+ggplot2::theme_set(ggplot2::theme_light())
+
+dir_data      <- here("data")
+pts_geo       <- file.path(dir_data, "pts.geojson")
+env_stack_grd <- file.path(dir_data, "env_stack.grd")
+mdl_maxv_rds  <- file.path(dir_data, "mdl_maxent_vif.rds")
+
+pts <- read_sf(pts_geo)
+env_stack <- raster::stack(env_stack_grd)
 ```
 
-# 1. Get species observation data for *Necturus maculosus*, the common mudpuppy salamander from GBIF
+# Lab 1 - Explore 
+
+## 1. Get species observation data for *Necturus maculosus*, the common mudpuppy salamander from GBIF
 
 ## 2. Image of *N. maculosus* 
 
@@ -193,9 +218,9 @@ In total, GBIF contains 1,205 observations of *N. maculosus*.
 
 Yes, I removed observations with the incorrect species name as well as one outlier observation point located in Europe. I also removed 421 duplicate observations.
 
-# Get Environment Data using `sdmpredictors`
+## Get Environment Data using `sdmpredictors`
 
-## Presence
+### Presence
 
 -   retrieve terrestrial environmental data for predicting the niche of the *N. maculosus* observations
 
@@ -209,7 +234,7 @@ options(sdmpredictors_datadir = dir_env)
 env_datasets <- sdmpredictors::list_datasets(terrestrial = TRUE, marine = FALSE)
 ```
 
-## View layers from the WorldClim and ENVIREM datasets
+### View layers from the WorldClim and ENVIREM datasets
 
 ```{r}
 # choose datasets for a vector
@@ -300,7 +325,7 @@ plot(env_stack, nc=2)
 #   mapview(env_stack, hide = T) # makes html too big for Github
 ```
 
-# 8. Map pseudo-absence points 
+## 8. Map pseudo-absence points 
 
 -   count observations in the raster
 -   create a mask
@@ -392,7 +417,7 @@ mapview(obs, col.regions = "green") +
           pageLength = 20))
 ```
 
-# 9. Term plots
+## 9. Environmental variable term plots
 
 -   density histogram where density is on the y axis
 
@@ -423,9 +448,9 @@ GGally::ggpairs(
   aes(color = factor(present)))
 ```
 
-# Logistic Regression 
+## Logistic Regression 
 
-## Setup Data 
+### Setup Data 
 - drop rows of data with any NA values (later, we'll learn how to impute values)
 - remove terms we don't want to model 
 ```{r}
@@ -450,7 +475,7 @@ range(y_predict)
 range(y_true)
 ```
 
-# 12. Generalized Linear Model
+## 12. Generalized Linear Model
 
 To solve this problem, we will apply a Logit Transformation 
 ```{r}
@@ -464,12 +489,12 @@ y_predict <- predict(mod, d, type="response")
 range(y_predict)
 ```
 
-## 13. GLM Term Plots 
+### 13. GLM Term Plots 
 ```{r}
 termplot(mod, partial.resid = TRUE, se = TRUE, main = F)
 ```
 
-# 14. Generalized Additive Model (GAM)
+## 14. Generalized Additive Model (GAM)
 We can further improve the GLM by adding "wiggle" to the relationship between the predictor and response variables 
 ```{r}
 # fit a generalized additive model with smooth predictors
@@ -490,56 +515,52 @@ mod <- mgcv::gam(
 summary(mod)
 ```
 
-## 15. GAM Term Plots 
+### 15. GAM Term Plots 
 ```{r}
 plot(mod, scale=0)
 ```
 
-## 16. **Question:** Which GAM environmental variables, and even range of values, seem to contribute most towards presence (above 0 response) versus absence (below 0 response)?
+### 16. **Question:** Which GAM environmental variables, and even range of values, seem to contribute most towards presence (above 0 response) versus absence (below 0 response)?
 
 Annual Precipitation (`WC_bio12`) and Longitude (`lon`) were the most statistically significant in the GAM model (p-value <<< 0). The Climatic Moisture Index (`ER_climaticMoistureIndex`),  Terrain Roughness Index (`ER_tri`), and latitude (`lat`) were the next most statistically significant variables in the GAM model (p-value < 0.001).
 
-# 17. Maxent (Max Entropy)
+## 17. Maxent (Max Entropy)
 This is the most commonly used species distribution model because it requires few input data points, all of which can be presence observation points, and is easy to use with a Java GUI. 
+- plot environmental rasters 
 ```{r}
 # show version of maxent
 #maxent()
-```
 
-```{r}
-# get environmental rasters
-# NOTE: the first part of Lab 1. SDM - Explore got updated to write this clipped environmental raster stack
 env_stack_grd <- file.path(dir_data, "env_stack.grd")
 env_stack <- stack(env_stack_grd)
 plot(env_stack, nc=2)
 ```
-
+Get present-only observation points and fit maximum entropy model 
 ```{r}
-# get presence-only observation points (maxent extracts raster values for you)
 obs_geo <- file.path(dir_data, "obs.geojson")
 obs_sp <- read_sf(obs_geo) %>% 
   sf::as_Spatial() # maxent prefers sp::SpatialPoints over newer sf::sf class
 
-# fit a maximum entropy model
+#note: always breaks when you try to run it all at once. have to restart the R session, re-run the Set Up chunk, then this runs. 
 mod <- maxent(env_stack, obs_sp)
 ```
 
-## 18. Maxent variable contribution plot 
+### 18. Maxent variable contribution plot 
 - plot variable contributions per predictor
 ```{r}
 plot(mod)
 ```
 
-# 19. Maxent Term Plots 
+### 19. Maxent Term Plots 
 ```{r}
 response(mod)
 ```
 
-## 20. **Question:** Which Maxent environmental variables, and even range of values, seem to contribute most towards presence (closer to 1 response) and how might this differ from the GAM results?
+### 20. **Question:** Which Maxent environmental variables, and even range of values, seem to contribute most towards presence (closer to 1 response) and how might this differ from the GAM results?
 
 Annual precipitation (`WC_bio12`) < 600 and annual precipitation > 1100, Terrain Roughness Index (`ER_tri`) > 100, and minimum temperature (`WC_bio6`) < -35 and WC_bio6 > 5 all seem to demonstrate fairly high predicted values. This is fewer variables than the GAM model, but there is overlap with annual precipitation and the Terrain Roughness Index. However, minimum temperature was not suggested by the GAM model. 
 
-## Predict 
+### Predict 
 ```{r}
 # predict
 y_predict <- predict(env_stack, mod) #, ext=ext, progress='')
@@ -584,7 +605,7 @@ table(d$present)
 table(d_train$present)
 ```
 
-## Partition, depth = 1 
+## 22. Partition, depth = 1 
 - run decision stump model with one split and two nodes 
 - plot the decision tree 
 ```{r}
@@ -596,25 +617,31 @@ par(mar = c(1, 1, 1, 1))
 rpart.plot(mod)
 ```
 
-## Partition, depth = default 
+## 23. Partition, depth = default 
 - run decision tree model with default settings
 - plot the decision tree 
-- plot the complexity parameter
+- plot the complexity parameter using `plotcp()`
 - display the cross validation results 
 ```{r}
 mod <- rpart(present ~ ., data = d_train)
 mod
 
 rpart.plot(mod)
+```
 
-# plot complexity parameter
+## 24. `Rpart` complexity parameter  
+
+```{r}
 plotcp(mod)
 
-# rpart cross validation results
 mod$cptable
 ```
 
-## Feature Interpretation 
+## 25. **Question:** Based on the complexity plot threshold, what size of tree is recommended?
+
+Approximately 10 branches are recommended to decrease the relative error without making the model too complicated. 
+
+## Feature interpretation 
 - plot caret cross validation results
   - as model complexity increases, its accuracy decreases 
   - in other words, it's detrimental for a model to become too complicated
@@ -629,20 +656,205 @@ mdl_caret <- train(
 ggplot(mdl_caret)
 ```
 
-## Examine the importance of each predictor 
+
+
+## 28. Examine the importance of each predictor 
 ```{r}
 vip(mdl_caret, num_features = 40, bar = FALSE)
 ```
+## 27. **Question:** what are the top 3 most important variables of your model?
+In my model, the top 3 most important variables are: 
+- latitude
+- longitude
+- and annual mean temperatire (`WC_bio1`). 
 
-# Partial dependence plots
+## Partial dependence plots
 - construct and display plots for the 3 most important predictors 
 ```{r}
 p1 <- partial(mdl_caret, pred.var = "lat") %>% autoplot()
-p2 <- partial(mdl_caret, pred.var = "WC_bio1") %>% autoplot()
-p3 <- partial(mdl_caret, pred.var = c("lat", "WC_bio1")) %>% 
+p2 <- partial(mdl_caret, pred.var = "lon") %>% autoplot()
+p3 <- partial(mdl_caret, pred.var = c("lat", "lon")) %>% 
   plotPartial(levelplot = FALSE, zlab = "yhat", drape = TRUE, 
               colorkey = TRUE, screen = list(z = -20, x = -60))
 
 gridExtra::grid.arrange(p1, p2, p3, ncol = 3)
 ```
 
+## Random Forests 
+
+```{r}
+# number of features
+n_features <- length(setdiff(names(d_train), "present"))
+
+# fit a default random forest model
+mdl_rf <- ranger(present ~ ., data = d_train)
+
+# get out of the box RMSE
+(default_rmse <- sqrt(mdl_rf$prediction.error))
+```
+
+### 28. Random Forest variable importance 
+```{r}
+# re-run model with impurity-based variable importance
+mdl_impurity <- ranger(
+  present ~ ., data = d_train,
+  importance = "impurity")
+
+# re-run model with permutation-based variable importance
+mdl_permutation <- ranger(
+  present ~ ., data = d_train,
+  importance = "permutation")
+p1 <- vip::vip(mdl_impurity, bar = FALSE)
+p2 <- vip::vip(mdl_permutation, bar = FALSE)
+
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+```
+## 29. **Question:** How might variable importance differ between rpart and RandomForest in your model outputs?
+
+In my `rpart()` model, latitude, longitude, and annual mean temperature (`WC_bio1`) were the top three most important variables. In my random forest model, longitude, annual precipitation (`WC_bio12`), and latitude are the top three most important variables. Thus, there is overlap between latitude and longitude, but the different models weighed the WorldClim variables differently. 
+
+# Lab 1d: Model Evaluation 
+
+## Split observation data into training and testing sets
+- the training data set uses 80% of the data 
+- the testing data set uses the remaining 20% of the data 
+```{r}
+pts_split  <- rsample::initial_split(
+  pts, prop = 0.8, strata = "present")
+pts_train  <- rsample::training(pts_split)
+pts_test   <- rsample::testing(pts_split)
+
+pts_train_p <- pts_train %>% 
+  filter(present == 1) %>% 
+  as_Spatial()
+pts_train_a <- pts_train %>% 
+  filter(present == 0) %>% 
+  as_Spatial()
+```
+
+## 30. Calibrate: Model Selection 
+- use a pairs plot to check correlation between environmental variables and assess multicollinearity issues 
+```{r}
+pairs(env_stack)
+```
+
+## 31. Calculate variance inflation factor per predictor, a metric of multicollinearity between variables
+```{r}
+vif(env_stack)
+```
+
+## 32. Stepwise reduce predictors, based on a max correlation of 0.7
+- conduct a multicollinearity reduction using `vifcor()`
+```{r}
+v <- vifcor(env_stack, th=0.7) 
+v
+```
+
+## 33. Reduce the environmental raster stack by excluding variables that were too correlated 
+- visualize the remaining variables with another pairs plot 
+```{r}
+env_stack_v <- usdm::exclude(env_stack, v)
+
+pairs(env_stack_v)
+```
+
+## 34. Fit a maximum entropy model using `maxent()`
+- plot variable contributions per predictor
+```{r}
+pts_train_test <- pts_train %>% 
+  select(present, geometry)
+
+if (!file.exists(mdl_maxv_rds)){
+  mdl_maxv <- maxent(env_stack_v, pts_train)
+  readr::write_rds(mdl_maxv, mdl_maxv_rds)
+}
+mdl_maxv <- read_rds(mdl_maxv_rds)
+
+plot(mdl_maxv)
+```
+## 35. **Question:** Which variables were removed due to multicollinearity and what is the rank of most to least important remaining variables in your model?
+
+Altitude (`WC_alt`), annual mean temperature (`WC_bio1`), mean diurnal temperature range (`WC_bio2`), minimum temperature (`WC_bio6`), annual precipitation (`WC_bio12`), precipitation of the driest month (`WC_bio14`), and the Terrain Roughness Index (`ER_tri`) were all removed. 
+
+From most to least important, the remaining variables are temperature seasonality (`WC_bio4`), the Climatic Moisture Index (`ER_climaticMoistureIndex`), altitude (`WC_alt`), and topographic wetness (`ER_topoWet`). 
+
+## 36. Maxent term plots
+```{r}
+response(mdl_maxv)
+```
+
+## 37. Map of Maxent prediction  
+```{r}
+y_maxv <- predict(env_stack, mdl_maxv) #, ext=ext, progress='')
+
+plot(y_maxv, main='Maxent, raw prediction')
+data(wrld_simpl, package="maptools")
+plot(wrld_simpl, add=TRUE, border='dark grey')
+```
+
+## Evaluate Model Performance 
+
+## Area Under the Curve (AUC), Receiver Operator Characteristic (ROC) Curve, and Confusion Matrix 
+- split the test data into presence and absence
+- use `dismo()` to calculate the AUC and max TPR + TNR
+```{r}
+pts_test_p <- pts_test %>% 
+  filter(present == 1) %>% 
+  as_Spatial()
+pts_test_a <- pts_test %>% 
+  filter(present == 0) %>% 
+  as_Spatial()
+
+y_maxv <- predict(mdl_maxv, env_stack)
+#plot(y_maxv)
+
+e <- dismo::evaluate(
+  p     = pts_test_p,
+  a     = pts_test_a, 
+  model = mdl_maxv,
+  x     = env_stack)
+e
+```
+## Plot the ROC Curve and the Area Under the Curve (AUC) 
+```{r}
+plot(e, 'ROC')
+
+thr <- threshold(e)[['spec_sens']]
+thr
+```
+
+## 39. Create the Confusion Matrix 
+```{r}
+p_true <- na.omit(raster::extract(y_maxv, pts_test_p) >= thr)
+a_true <- na.omit(raster::extract(y_maxv, pts_test_a) < thr)
+
+# (t)rue/(f)alse (p)ositive/(n)egative rates
+tpr <- sum(p_true)/length(p_true)
+fnr <- sum(!p_true)/length(p_true)
+fpr <- sum(!a_true)/length(a_true)
+tnr <- sum(a_true)/length(a_true)
+
+matrix(
+  c(tpr, fnr,
+    fpr, tnr), 
+  nrow=2, dimnames = list(
+    c("present_obs", "absent_obs"),
+    c("present_pred", "absent_pred")))
+```
+
+## 40. Plot the ROC Curve and the Area Under the Curve (AUC) 
+- identify the threshold and mark it in blue on the plot 
+```{r}
+plot(e, 'ROC')
+
+thr <- threshold(e)[['spec_sens']]
+thr
+
+points(fpr, tpr, pch=23, bg="blue")
+```
+
+
+## 41. Plot the areas where we predict *Necturus maculosus* presence 
+```{r}
+plot(y_maxv > thr)
+```
