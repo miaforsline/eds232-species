@@ -1,0 +1,174 @@
+---
+title: "Lab 1b: Species Distribution Modeling - Logistic Regression"
+author: "Mia Forsline"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: flatly
+    code_folding: show
+    toc: true
+    toc_float: true
+    number_sections: true 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE, 
+                      warning = FALSE, 
+                      include = TRUE,
+                      quiet = TRUE)
+```
+
+# Learning Objectives - Explore 
+
+Exploratory Data Analysis (cont’d):
+- Pairs plot to show correlation between variables and avoid multicollinearity (see 8.2 Many predictors in a model)
+Logistic Regression seen as an evolution of techniques
+- Linear Model to show simplest multivariate regression, but predictions can be outside the binary values.
+- Generalized Linear Model uses a logit transformation to constrain the outputs to being within two values.
+- Generalized Additive Model allows for “wiggle” in predictor terms.
+- Maxent (Maximum Entropy) is a presence-only modeling technique that allows for a more complex set of shapes between predictor and response.
+
+# Load packages and environmental data layers  
+```{r}
+librarian::shelf(
+  DT, dplyr, dismo, GGally, here, readr, tidyr)
+select <- dplyr::select # overwrite raster::select
+options(readr.show_col_types = F)
+
+dir_data    <- here("data")
+pts_env_csv <- file.path(dir_data, "pts_env.csv")
+
+pts_env <- read_csv(pts_env_csv)
+nrow(pts_env)
+```
+
+## Displate environmental data in a table 
+```{r}
+datatable(pts_env, rownames = F)
+```
+## Use `GGally` to look at pair plots and examine correlations between environmental variables 
+```{r}
+GGally::ggpairs(
+  select(pts_env, -ID),
+  aes(color = factor(present)))
+```
+# Logistic Regression 
+## Setup Data 
+- drop rows of data with any NA values (later, we'll learn how to impute values)
+- remove terms we don't want to model 
+```{r}
+d <- pts_env %>% 
+  select(-ID) %>%  # remove terms we don't want to model
+  tidyr::drop_na() # drop the rows with NA values
+nrow(d)
+```
+
+## Linear Model 
+- dependent variable Y: presence/absence, aka 1/0
+- independent variables X: everything else in the dataframe, aka the environmental layers 
+```{r}
+mod <- lm(present ~ ., data = d)
+summary(mod)
+```
+
+Note: a linear model is ineffective because it predicts values outside the 0 - 1 range
+```{r}
+y_predict <- predict(mod, pts_env, type="response")
+y_true    <- pts_env$present
+
+range(y_predict)
+range(y_true)
+```
+
+# Generalized Linear Model 
+To solve this problem, we will apply a Logit Transformation 
+```{r}
+# fit a generalized linear model with a binomial logit link function
+mod <- glm(present ~ ., family = binomial(link="logit"), data = d)
+summary(mod)
+```
+Note: we are not within the 0 - 1 range we want to be in
+```{r}
+y_predict <- predict(mod, d, type="response")
+range(y_predict)
+```
+
+## Term Plots 
+```{r}
+termplot(mod, partial.resid = TRUE, se = TRUE, main = F)
+```
+
+# Generalized Additive Model (GAM)
+We can further improve the GLM by adding "wiggle" to the relationship between the predictor and response variables 
+```{r}
+librarian::shelf(mgcv)
+
+# fit a generalized additive model with smooth predictors
+mod <- mgcv::gam(
+  formula = present ~ s(WC_alt) + 
+                      s(WC_bio1) + 
+                      s(WC_bio4) + 
+                      s(WC_bio12) + 
+                      s(ER_climaticMoistureIndex) + 
+                      s(ER_tri) + 
+                      s(ER_topoWet) + 
+                      s(lon) + 
+                      s(lat), 
+  family = binomial, data = d)
+summary(mod)
+```
+
+## Term Plots 
+```{r}
+plot(mod, scale=0)
+```
+
+# Maxent (Max Entropy)
+This is the most commonly used species distribution model because it requires few input data points, all of which can be presence observation points, and is easy to use with a Java GUI. 
+```{r}
+# load extra packages
+librarian::shelf(
+  maptools, sf)
+
+# show version of maxent
+maxent()
+```
+
+```{r}
+# get environmental rasters
+# NOTE: the first part of Lab 1. SDM - Explore got updated to write this clipped environmental raster stack
+env_stack_grd <- file.path(dir_data, "env_stack.grd")
+env_stack <- stack(env_stack_grd)
+plot(env_stack, nc=2)
+```
+
+```{r}
+# get presence-only observation points (maxent extracts raster values for you)
+obs_geo <- file.path(dir_data, "obs.geojson")
+obs_sp <- read_sf(obs_geo) %>% 
+  sf::as_Spatial() # maxent prefers sp::SpatialPoints over newer sf::sf class
+
+# fit a maximum entropy model
+mod <- maxent(env_stack, obs_sp)
+```
+
+```{r}
+# plot variable contributions per predictor
+plot(mod)
+```
+
+# Term Plots 
+```{r}
+# plot term plots
+response(mod)
+```
+## Predict 
+```{r}
+# predict
+y_predict <- predict(env_stack, mod) #, ext=ext, progress='')
+
+plot(y_predict, main='Maxent, raw prediction')
+data(wrld_simpl, package="maptools")
+plot(wrld_simpl, add=TRUE, border='dark grey')
+```
