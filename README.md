@@ -1,6 +1,7 @@
-# HW1: Species Distribution Models 
-## Student authors: Mia Forsline 
-### EDS 232: Machine Learning in Environmental Data Science 
+# EDS 232: Machine Learning in Environmental Science (Winter Quarter 2022) - Species Distribution Models  
+## [Course website](https://bbest.github.io/eds232-ml/)
+## Instructor: Ben Best
+## Student author: Mia Forsline 
 ### Due 2022-01-19
 
 ## Motivation and project goal
@@ -25,10 +26,10 @@ Future research aims to inform policy regarding renewable wind energy in the Uni
 
 ## Installation
 The following packages were utilized during this analysis:
-- sqlalchemy
-- psycopg2
-- geopandas
-- math
+- `sqlalchemy`
+- `psycopg2`
+- `geopandas`
+- `math`
 
 ## Data
 Data for this analysis is NOT hosted in the repository because the source code directly pulls all data from [WorldClim](https://worldclim.org/) and [ENVIREM](https://envirem.github.io/). Data was incorporated using following file structure.
