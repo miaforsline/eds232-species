@@ -45,3 +45,9 @@ Data for this analysis is NOT hosted in the repository because the source code d
     - JPEG files
     - /data (_data_)
       - /env
+
+## Assignment overview: 
+1. [Explore the data](https://bbest.github.io/eds232-ml/lab1a_sdm-explore.html)
+2. [Logistic regression](https://bbest.github.io/eds232-ml/lab1b_sdm-regress.html)
+3. [Decision trees and random forests](https://bbest.github.io/eds232-ml/lab1b_sdm-regress.html)
+4. [Evaluate](https://bbest.github.io/eds232-ml/lab1d_sdm-evaluate.html)
